@@ -19,12 +19,30 @@ document.addEventListener("DOMContentLoaded", () => {
         activityCard.className = "activity-card";
 
         const spotsLeft = details.max_participants - details.participants.length;
+        const participants = Array.isArray(details.participants) ? details.participants : [];
+        const participantList = participants.length
+          ? `<div class="participants-list">${participants
+              .map(
+                (participant) => `
+                  <div class="participant-row">
+                    <span class="participant-name">${participant}</span>
+                    <button class="participant-delete" type="button" data-activity="${name}" data-email="${participant}" aria-label="Remove ${participant}">
+                      ✕
+                    </button>
+                  </div>`
+              )
+              .join("")}</div>`
+          : `<p class="participants-empty">No participants yet.</p>`;
 
         activityCard.innerHTML = `
           <h4>${name}</h4>
           <p>${details.description}</p>
           <p><strong>Schedule:</strong> ${details.schedule}</p>
           <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
+          <div class="participants-section">
+            <strong>Participants</strong>
+            ${participantList}
+          </div>
         `;
 
         activitiesList.appendChild(activityCard);
@@ -38,6 +56,30 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (error) {
       activitiesList.innerHTML = "<p>Failed to load activities. Please try again later.</p>";
       console.error("Error fetching activities:", error);
+    }
+  }
+
+  async function unregisterParticipant(activityName, email) {
+    try {
+      const response = await fetch(`/activities/${encodeURIComponent(activityName)}/participants/${encodeURIComponent(email)}`, {
+        method: "DELETE",
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.detail || "Unable to unregister participant");
+      }
+
+      await fetchActivities();
+      messageDiv.textContent = result.message;
+      messageDiv.className = "success";
+      messageDiv.classList.remove("hidden");
+    } catch (error) {
+      messageDiv.textContent = error.message;
+      messageDiv.className = "error";
+      messageDiv.classList.remove("hidden");
+      console.error("Error unregistering participant:", error);
     }
   }
 
@@ -79,6 +121,14 @@ document.addEventListener("DOMContentLoaded", () => {
       messageDiv.classList.remove("hidden");
       console.error("Error signing up:", error);
     }
+  });
+
+  document.addEventListener("click", async (event) => {
+    const button = event.target.closest(".participant-delete");
+    if (!button) return;
+
+    event.preventDefault();
+    await unregisterParticipant(button.dataset.activity, button.dataset.email);
   });
 
   // Initialize app
